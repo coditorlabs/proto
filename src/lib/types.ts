@@ -25,3 +25,10 @@ export type EditorEvent =
         text: string;
       }>;
     };
+
+export type RecordingData = {
+  events: EditorEvent[];
+  initialValue: string;
+  audioBlob: Blob;
+  duration: number;
+};

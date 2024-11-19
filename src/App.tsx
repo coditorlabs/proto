@@ -1,9 +1,9 @@
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { monaco } from "./lib/monaco";
-import "./userWorker";
-import { Recorder } from "./lib/recorder";
 import { Player } from "./lib/player";
-import { EditorEvent } from "./lib/types";
+import { Recorder } from "./lib/recorder";
+import { RecordingData } from "./lib/types";
+import "./userWorker";
 
 const code = ["function x() {", '\tconsole.log("Hello world!");', "}"].join(
   "\n"
@@ -16,7 +16,12 @@ export function App() {
   const player = useRef<Player | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [events, setEvents] = useState<EditorEvent[]>([]);
+  const [recordingData, setRecordingData] = useState<RecordingData>({
+    events: [],
+    initialValue: "",
+    audioBlob: new Blob(),
+    duration: 0,
+  });
 
   useEffect(() => {
     if (!monacoEl.current || editor) {
@@ -29,7 +34,7 @@ export function App() {
       theme: "vs-dark",
     });
     recorder.current = new Recorder(_editor);
-    player.current = new Player(_editor, [], code);
+    player.current = new Player(_editor, recordingData);
     setEditor(_editor);
 
     return () => {
@@ -47,16 +52,16 @@ export function App() {
 
   const handleStopRecording = () => {
     if (recorder.current) {
-      const recordedEvents = recorder.current.stop();
-      console.log(recordedEvents);
-      setEvents(recordedEvents);
+      const recordedData = recorder.current.stop();
+      console.log(recordedData);
+      setRecordingData(recordedData);
       setIsRecording(false);
     }
   };
 
   const handleStartPlaying = () => {
-    if (player.current && events.length > 0) {
-      player.current = new Player(editor!, events, code);
+    if (player.current && recordingData.events.length > 0) {
+      player.current = new Player(editor!, recordingData);
       player.current.play();
       setIsPlaying(true);
     }
@@ -87,7 +92,9 @@ export function App() {
         </button>
         <button
           onClick={handleStartPlaying}
-          disabled={isRecording || isPlaying || events.length === 0}
+          disabled={
+            isRecording || isPlaying || recordingData.events.length === 0
+          }
         >
           Start Playing
         </button>

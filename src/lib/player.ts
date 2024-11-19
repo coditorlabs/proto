@@ -1,5 +1,5 @@
 import { monaco } from "./monaco";
-import { EditorEvent } from "./types";
+import { EditorEvent, RecordingData } from "./types";
 
 export class Player {
   private editor: monaco.editor.IStandaloneCodeEditor;
@@ -7,14 +7,22 @@ export class Player {
   private lastPlayedEventIndex = 0;
   private state: "playing" | "paused" | "stopped" = "stopped";
   private initialCode: string;
+  private audioBlob: Blob;
+  private duration: number;
+  private audio: HTMLAudioElement | null = null;
+  private lastPlayedTime = 0;
+  private rafId: number | null = null;
+  private startTime: number | null = null;
+
   constructor(
     editor: monaco.editor.IStandaloneCodeEditor,
-    events: EditorEvent[],
-    initialCode: string
+    recordingData: RecordingData
   ) {
     this.editor = editor;
-    this.events = events;
-    this.initialCode = initialCode;
+    this.events = recordingData.events;
+    this.initialCode = recordingData.initialValue;
+    this.audioBlob = recordingData.audioBlob;
+    this.duration = recordingData.duration;
   }
 
   play() {
@@ -25,7 +33,47 @@ export class Player {
     this.editor.focus();
     this.state = "playing";
     this.lastPlayedEventIndex = 0;
-    this.playNextEvent();
+    this.lastPlayedTime = 0;
+    this.startTime = null;
+
+    this.audio = new Audio(URL.createObjectURL(this.audioBlob));
+    this.startPlayback();
+    this.audio.play();
+  }
+
+  private startPlayback() {
+    const animate = (timestamp: number) => {
+      if (this.startTime === null) {
+        this.startTime = timestamp;
+      }
+
+      const currentTime = timestamp - this.startTime;
+      const events = this.events.filter(
+        (ev) =>
+          ev.timestamp <= currentTime && ev.timestamp > this.lastPlayedTime
+      );
+
+      this.lastPlayedTime = currentTime;
+      events.forEach((e) => this.playEvent(e));
+
+      if (this.state === "playing") {
+        this.rafId = requestAnimationFrame(animate);
+      }
+    };
+
+    this.rafId = requestAnimationFrame(animate);
+  }
+
+  stop() {
+    this.state = "stopped";
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    if (this.audio) {
+      this.audio.pause();
+      this.audio.currentTime = 0;
+    }
   }
 
   wait(ms: number) {
